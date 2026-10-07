@@ -1,132 +1,30 @@
-# ExPack for Minecraft 1.21.6
+# retpack
 
-Optimisation and Quality of Life mods for Minecraft.
+A Fabric modpack for vanilla survival with shaders, distant terrain, and building tools. Forked from [ExPack](https://github.com/MAttila42/expack).
 
-## To use
+Minecraft **26.2**, Fabric **0.19.5**, Java **25**.
 
- 1. Run the Fabric installer
- 2. Copy `mods`, `resourcepacks`, `shaderpacks`, `options.txt` into the Minecraft folder*
- 3. Copy `datapacks` in any world you fancy
+## Contents
 
-(* default path: `%appdata%/.minecraft`)
+- **Performance:** Sodium, Lithium, C2ME, FerriteCore, ImmediatelyFast, BadOptimizations, Entity Culling, More Culling, and Debugify.
+- **Graphics:** Iris, Voxy, LambDynamicLights, Complementary Reimagined (default), and Photon.
+- **Building:** Litematica, MiniHUD, Tweakeroo, and MaLiLib.
+- **Interface:** Mod Menu, Shulker Box Tooltip, Chat Heads, and Better Mount HUD.
+- **Optional lab:** Carpet for farm testing and Axiom for creative building.
+- **Optional terrain generation:** Voxy WorldGen fills unseen terrain. Disabled by default because of a [reported shutdown hang with C2ME](https://github.com/iSeeEthan/voxy_worldgen_v2/issues/99).
 
-## Pack contents
+Mod versions and download hashes are tracked with [packwiz](https://packwiz.infra.link/) in `pack/`. Sodium, Iris, and Voxy are pinned together for shader compatibility.
 
-### Mods
+## Install
 
-- BadOptimizations
-- (Better Ping Display)
-- Better Mount HUD
-- Better Statistics Screen [BETA]
-- Bobby
-- Chat Heads
-- Cloth Config API
-- (Detail Armor Bar)
-- (Distant Horizons)
-- Entity Culling
-- Essential
-- Fabric API
-- Fabric Language Kotlin
-- FerriteCore
-- ImmediatelyFast
-- Iris
-- LambDynamicLights
-- Lithium
-- MidnightLib
-- (ModernFix)
-- Mod Menu [BETA]
-- (More Chat History)
-- More Culling [BETA]
-- No Chat Reports
-- Noisium
-- Nvidium [PORT/BETA]
-- (OfflineSkins)
-- OptiGUI [BETA]
-- Raised
-- Reese's Sodium Options
-- Shulker Box Tooltip
-- Sodium [BETA]
-- Sodium Extra
-- TCDCommons API [BETA]
+On Windows, run from the repository folder:
 
-(...) = not yet updated
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
+```
 
-### Shaderpacks
+In Legacy Launcher, use the printed game directory, disable subfolders, select `fabric-loader-0.19.5-26.2`, and use Recommended Java.
 
-- Complementary Reimagined Shaders
+Use `-Lab -Destination <folder>` for a separate lab instance, or `-WorldGen` to include terrain generation. Keep those switches when updating; omitted optional mods are removed. Existing settings and worlds are preserved.
 
-### Resource packs
-
-- Visual Brush Durability
-- Colourful Containers
-- VanillaTweaks:
-  - JappaStatsIcons
-  - JappaSpecIcons
-  - RedstoneWireFix
-  - DripleafFixBig
-  - DripleafFixSmall
-  - ConsistentDecorPot
-  - CactusBottomFix
-  - SlimeParticleFix
-  - BlazeFix
-  - IronBarsFix
-  - UniqueDyes
-  - UnobtrusiveRain
-  - UnobtrusiveSnow
-  - LowerFire
-  - LowerShield
-  - DiminishingTools
-  - DifferentStems
-  - Age25Kelp
-  - ClearBannerPatterns
-  - StickyPistonSides
-  - DirectionalDispensersDroppers
-  - GroovyLevers
-  - CompassLodestone
-  - VisualHoney
-  - VisualSaplingGrowth
-  - VariatedVillagers
-  - CircleLogTops
-  - FancySunflowers
-  - ShorterGrass
-  - ShorterTallGrass
-  - RedIronGolemFlowers
-  - HDShieldBanners
-  - AnimatedCampfireItem
-  - SplashXpBottle
-  - MossCarpetOverhang
-  - NoBowlParticles
-  - ItemHoldFix
-  - ProperBreakParticles
-  - DirectionalHoppers
-  - JappaObserver
-  - BetterObservers
-  - SoulSoilSoulCampfire
-  - AshlessCampfires
-
-### Datapacks
-
-- AFK Display
-- Banner Bedsheets
-- BlazeandCave's Advancements Pack
-- Coordinates HUD
-- Mini Blocks
-- More Mob Heads
-- Nether Portal Coords
-- Player Head Drops
-- Silence Mobs
-- Spawning Spheres
-- Spectator Conduit Power
-- Spectator Night Vision
-- Track Raw Statistics
-- Track Statistics
-- Crafting Tweaks:
-  - Blackstone Cobblestone
-  - Dropper to Dispenser
-  - Powder to Glass
-  - Straight to Shapeless
-  - Universal Dyeing
-
-### Other
-
-Custom options.txt
+With packwiz installed, run `scripts/build.ps1` to export survival and lab `.mrpack` files into `dist/`.

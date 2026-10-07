@@ -1,0 +1,14 @@
+name = "retpack"
+author = "Rettend; based on ExPack by MAttila42"
+version = "0.1.0"
+description = "Vanilla survival, long-distance terrain, shaders, and technical building tools."
+pack-format = "packwiz:1.1.0"
+
+[index]
+file = "index.toml"
+hash-format = "sha256"
+hash = "1fca1ca7103feefa55c1157d0415452454a4fab928550b4b50d0382b7d450bc5"
+
+[versions]
+fabric = "0.19.5"
+minecraft = "26.2"

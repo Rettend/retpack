@@ -1,0 +1,142 @@
+hash-format = "sha256"
+
+[[files]]
+file = "config/iris.properties"
+hash = "efe0c30620affee4a63c94309643da1b5a10d9b411d292f1394bd233489a7334"
+
+[[files]]
+file = "config/voxy-config.json"
+hash = "4ea15dfc532efc66454dd84d5e707631ed2d827da4536f788e792a17450e5ff0"
+
+[[files]]
+file = "mods/badoptimizations.pw.toml"
+hash = "3635aff985b59e95eabf5ca9be77d20d25c9d4e2b20f97df42639ea794eda1f3"
+metafile = true
+
+[[files]]
+file = "mods/better-mount-hud.pw.toml"
+hash = "6e9bddf1d0b01deb875b99fda9395b7bf927ce1a795a70b5a1bd56500e43df03"
+metafile = true
+
+[[files]]
+file = "mods/c2me-fabric.pw.toml"
+hash = "1fda69d944781149ffec5c7263cecfb5b56a17b83c35229e46706c33fdc6819c"
+metafile = true
+
+[[files]]
+file = "mods/chat-heads.pw.toml"
+hash = "cbcc1fee52838e0f9610594542fa6686a3593fae908365b2e01c217a83921169"
+metafile = true
+
+[[files]]
+file = "mods/cloth-config.pw.toml"
+hash = "7fa9592b9948b8809018a4e7c3ca7da4d19fc5ef8c03021414cb22ae0253f083"
+metafile = true
+
+[[files]]
+file = "mods/debugify.pw.toml"
+hash = "7a4aabc6906981c5401fb54ab640f246eea94cd5214efeffe280e1f6130b1530"
+metafile = true
+
+[[files]]
+file = "mods/entityculling.pw.toml"
+hash = "9ccaa582844d45222581b90ca5ce61acf117408c635b904673e1c4d89969f40b"
+metafile = true
+
+[[files]]
+file = "mods/fabric-api.pw.toml"
+hash = "af4c96fcc59bec634f457bf7693496f203ceaac28a180e84a73c488a1a2895cb"
+metafile = true
+
+[[files]]
+file = "mods/ferrite-core.pw.toml"
+hash = "069d81cab53c0141459ad4d70bcf3e10f17652f24cc62d3b4a0fc2cd2b700871"
+metafile = true
+
+[[files]]
+file = "mods/immediatelyfast.pw.toml"
+hash = "fcd0dedf8a47b5e5e298cb9e26fe8f9bb3be8ac892e7ad238f8f781c0faaf2bd"
+metafile = true
+
+[[files]]
+file = "mods/iris.pw.toml"
+hash = "84a3cef87679c0d21dceb4641167dc0368b9a3593698f6a3632485e9b3a8d5da"
+metafile = true
+
+[[files]]
+file = "mods/lambdynamiclights.pw.toml"
+hash = "a5a49f16c46123806cd53726bf7f99e0a1b250293a4492f695944afc8bd32fb2"
+metafile = true
+
+[[files]]
+file = "mods/litematica.pw.toml"
+hash = "737265495e3e1727d41d80ae57acbd8839e243331f0d2057a77433088e66c028"
+metafile = true
+
+[[files]]
+file = "mods/lithium.pw.toml"
+hash = "a5ee497ec151dd6e6b946091e12e2c56362e5c772c4b8ea175b2e81277cc708d"
+metafile = true
+
+[[files]]
+file = "mods/malilib.pw.toml"
+hash = "7acf0e421b5d19448fb1572d10c481760a6ffe68f452b074b1fc8c993ce1556b"
+metafile = true
+
+[[files]]
+file = "mods/minihud.pw.toml"
+hash = "c4e9775beb3fa4a3e9db0a53881eb531bafd39580a786d200e5ff18da2b69409"
+metafile = true
+
+[[files]]
+file = "mods/modmenu.pw.toml"
+hash = "dc9906e45919f5b3a31e3d5582cd97bdd7534f56c2a5e730b9de41875a97e1eb"
+metafile = true
+
+[[files]]
+file = "mods/moreculling.pw.toml"
+hash = "a7038f7260b128480f8a62b12e5583240c2a94bd782c1b60e2356ec7a3843e4c"
+metafile = true
+
+[[files]]
+file = "mods/placeholder-api.pw.toml"
+hash = "b234ade7fd54bb9d99c27769cd1635b18835752676d0cdd0a29af2b4146251a8"
+metafile = true
+
+[[files]]
+file = "mods/shulkerboxtooltip.pw.toml"
+hash = "a3c98b17ea14147b41b2823b6246c03de59b6ef80f1b6e5b1d92adabd23a91ae"
+metafile = true
+
+[[files]]
+file = "mods/sodium.pw.toml"
+hash = "f06c0b9150da9877b99cb265d037c067e509340d9bf347e02cef2043c110e963"
+metafile = true
+
+[[files]]
+file = "mods/tweakeroo.pw.toml"
+hash = "84a1ee4078568898046061003cc26c78d65ad8466dd4ea77de2582eede127135"
+metafile = true
+
+[[files]]
+file = "mods/voxy.pw.toml"
+hash = "a10b1bdec4bf70a64072317a42b4c8b696cb8e09f952af139563c553755a0129"
+metafile = true
+
+[[files]]
+file = "options.txt"
+hash = "53d4d41fcb823a9dc4c5f4ebc9667d9dfa4eceaaf249cf409beef5b4de9fb6be"
+
+[[files]]
+file = "shaderpacks/ComplementaryReimagined_r5.9.3.zip.txt"
+hash = "fa5efb3d0eabfdb4407f3105b5f57871cae9e344dd1949d41ea1935c5ea4e218"
+
+[[files]]
+file = "shaderpacks/complementary-reimagined.pw.toml"
+hash = "948b6d4ff15ed049a8b33bafce62c3eceb825552a9fe0b043a177868ca026d7d"
+metafile = true
+
+[[files]]
+file = "shaderpacks/photon-shader.pw.toml"
+hash = "c269347417720d5b66d6c7a0bc7fec53e6092be8151f5a6e4b328bfe5432bc60"
+metafile = true

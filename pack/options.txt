@@ -1,0 +1,11 @@
+autoJump:false
+enableVsync:true
+renderDistance:12
+simulationDistance:8
+maxFps:60
+graphicsMode:1
+renderClouds:"false"
+guiScale:0
+advancedItemTooltips:true
+key_iris.keybind.toggleShaders:key.keyboard.f8
+key_iris.keybind.shaderPackSelection:key.keyboard.f7
