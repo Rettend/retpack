@@ -1,0 +1,5 @@
+Before starting WorldGen, add the argument from java-arguments.txt to this instance's launcher Java/JVM arguments, not Minecraft/game arguments. Keep your other Java arguments.
+
+This tested compatibility workaround excludes C2ME's chunk-system rewrite, no-tick view distance and server utilities. The OpenCL accelerator is also excluded if present. Generation and saving/reopening a world worked with the pinned versions; this is not an upstream fix. Jars are not patched, and importing the pack does not apply Java arguments.
+
+Legacy Launcher stores Java arguments globally. Remove this argument when switching to an instance where you want full C2ME. Other launchers may offer per-instance Java arguments.

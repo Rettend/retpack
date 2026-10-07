@@ -12,8 +12,9 @@ The game directory. Defaults to %APPDATA%\retpack\survival.
 .PARAMETER Lab
 Also installs the downloads pinned in optional-lab/*.pw.toml.
 .PARAMETER WorldGen
-Also installs the downloads pinned in optional-worldgen/*.pw.toml. This is opt-in
-because save/quit hangs have been reported with WorldGen and C2ME.
+Also installs the downloads pinned in optional-worldgen/*.pw.toml and missing
+WorldGen config defaults. Prints the required manual launcher Java argument for
+the tested C2ME shutdown workaround; launcher settings are not changed.
 .PARAMETER VerifyOnly
 Checks installed, managed files against .retpack-installed.json without network
 access or changing files. User settings and overrides are not managed files.
@@ -421,6 +422,19 @@ if ($WorldGen) {
         $download = Get-RetpackDownload $source 'mods'
         if ($null -ne $download) { $downloads += $download }
     }
+    $worldGenArgumentsPath = Get-RetpackPath $worldGenRoot 'java-arguments.txt'
+    $worldGenArguments = [IO.File]::ReadAllText($worldGenArgumentsPath).Trim()
+    if ($worldGenArguments -notmatch '\A-Dfabric\.debug\.disableModIds=[a-z0-9-]+(?:,[a-z0-9-]+)*\z') {
+        throw "Expected one Fabric disableModIds Java argument in '$worldGenArgumentsPath'."
+    }
+    $worldGenConfigRelative = 'config/voxyworldgenv2.json'
+    $worldGenConfigSource = Get-RetpackPath $worldGenRoot $worldGenConfigRelative
+    $overrides += [pscustomobject]@{
+        path = $worldGenConfigRelative
+        source = $worldGenConfigSource
+        hashFormat = 'sha256'
+        hash = (Get-FileHash -LiteralPath $worldGenConfigSource -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
 }
 
 $knownFiles = @{}
@@ -534,6 +548,11 @@ try {
     Copy-Item -LiteralPath $manifestStage -Destination $manifestPath -Force
     Write-Host "Installed Retpack in '$destinationRoot'. Existing settings and saves were kept."
     Write-Host "In Legacy Launcher, set this as the game directory and select '$profileId'. Let the launcher download Minecraft, libraries, and Java."
+    if ($WorldGen) {
+        Write-Host 'WorldGen requires manual launcher setup before starting Minecraft: add this to this instance''s Java/JVM arguments (not game arguments), keeping your other Java arguments:'
+        Write-Host $worldGenArguments
+        Write-Host 'This is a tested C2ME compatibility workaround, not an upstream fix. Legacy applies Java arguments globally. Launcher settings and jars were not patched. See optional-worldgen/launcher-setup.txt.'
+    }
 } finally {
     # Only the unique staging directory created by this invocation is removed.
     if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force }

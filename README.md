@@ -27,4 +27,6 @@ In Legacy Launcher, use the printed game directory, disable subfolders, select `
 
 Use `-Lab -Destination <folder>` for a separate lab instance, or `-WorldGen` to include terrain generation. Keep those switches when updating; omitted optional mods are removed. Existing settings and worlds are preserved.
 
-With packwiz installed, run `scripts/build.ps1` to export survival and lab `.mrpack` files into `dist/`.
+Before using WorldGen, add the exact argument in [`optional-worldgen/java-arguments.txt`](optional-worldgen/java-arguments.txt) to the launcher's Java/JVM arguments. This is a tested C2ME compatibility workaround, not an upstream fix. Legacy applies Java arguments globally; see [launcher setup](optional-worldgen/launcher-setup.txt). The installer prints the argument and preserves existing settings.
+
+With packwiz installed, run `scripts/build.ps1` to export survival and lab `.mrpack` files into `dist/`. Add `-WorldGen` for `retpack-worldgen.mrpack`, including config defaults and manual launcher instructions. Importing it does not apply Java arguments.
