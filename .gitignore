@@ -1,6 +1,10 @@
 /dist/
 /docs/
 /.tools/
+/other/
+/tools/farmbench/.venv/
+__pycache__/
+.pytest_cache/
 *.mrpack
 *.jar
 *.zip
