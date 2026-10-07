@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "farmbench",
+  "version": "${version}",
+  "name": "Farmbench",
+  "description": "Local paired farm benchmarks with verified world ticks and Carpet counters.",
+  "authors": ["Rettend"],
+  "environment": "*",
+  "entrypoints": {"main": ["me.rettend.farmbench.FarmbenchMod"]},
+  "mixins": ["farmbench.mixins.json"],
+  "depends": {
+    "fabricloader": "=0.19.5",
+    "minecraft": "=26.2",
+    "java": ">=25",
+    "fabric-api": "=0.161.0+26.2",
+    "carpet": "=26.2+v260616"
+  }
+}

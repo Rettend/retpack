@@ -1,0 +1,22 @@
+[project]
+name = "retpack-farmbench"
+version = "0.1.0"
+description = "Compile Minecraft farm blueprints and run paired lab benchmarks"
+requires-python = ">=3.11"
+dependencies = ["mcblueprint==0.1.0"]
+
+[project.scripts]
+farmbench = "farmbench.cli:main"
+
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/farmbench"]
+
+[dependency-groups]
+dev = ["pytest>=8,<10"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,6 +1,13 @@
 /dist/
 /docs/
 /.tools/
+/other/
+/blueprints/
+/tools/farmbench/.venv/
+__pycache__/
+.pytest_cache/
+/tools/farmbench-mod/.gradle/
+/tools/farmbench-mod/build/
 *.mrpack
 *.jar
 *.zip
