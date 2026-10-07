@@ -2,11 +2,15 @@ hash-format = "sha256"
 
 [[files]]
 file = "config/iris.properties"
-hash = "efe0c30620affee4a63c94309643da1b5a10d9b411d292f1394bd233489a7334"
+hash = "310dcde949f617b301db4d86df4dc208358071d9fbda77ee190df36ae7f083c0"
+
+[[files]]
+file = "config/sodium-options.json"
+hash = "6ec390ee6243c35b8d603c82d1b86eb7687b423aaeef23d0dda650a8ec8c4202"
 
 [[files]]
 file = "config/voxy-config.json"
-hash = "4ea15dfc532efc66454dd84d5e707631ed2d827da4536f788e792a17450e5ff0"
+hash = "294396db537393c5c141ad05497efd76288666b2201be2da0ea9787b0e674004"
 
 [[files]]
 file = "mods/badoptimizations.pw.toml"
@@ -125,11 +129,11 @@ metafile = true
 
 [[files]]
 file = "options.txt"
-hash = "53d4d41fcb823a9dc4c5f4ebc9667d9dfa4eceaaf249cf409beef5b4de9fb6be"
+hash = "e95598747883aca27db2ce68f778a70a8f98e3f5ff23afc1136d92dc9c9685da"
 
 [[files]]
 file = "shaderpacks/ComplementaryReimagined_r5.9.3.zip.txt"
-hash = "fa5efb3d0eabfdb4407f3105b5f57871cae9e344dd1949d41ea1935c5ea4e218"
+hash = "7584db6cefc91de2241aa0e3df4dfe5b29e33bc534df2019de4181cdf0567a72"
 
 [[files]]
 file = "shaderpacks/complementary-reimagined.pw.toml"

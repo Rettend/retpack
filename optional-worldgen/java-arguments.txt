@@ -1,0 +1,1 @@
+-Dfabric.debug.disableModIds=c2me-rewrites-chunk-system,c2me-notickvd,c2me-opts-accel-opencl,c2me-server-utils
