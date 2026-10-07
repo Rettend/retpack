@@ -1,4 +1,4 @@
-"""Command-line entry point for the manual farm lab workflow."""
+"""Command-line entry point for farm compilation and lab benchmarks."""
 
 from __future__ import annotations
 
@@ -6,12 +6,13 @@ import argparse
 import hashlib
 import json
 import sys
+import shutil
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
 from . import __version__
-from .environment import capture_environment
+from .environment import capture_environment, resolve_instance
 
 
 def _read_json(path: str | Path) -> dict:
@@ -29,7 +30,7 @@ def _write_json(path: Path, value: dict) -> None:
 
 
 def parser() -> argparse.ArgumentParser:
-    root = argparse.ArgumentParser(prog="farmbench", description="Compile farm blueprints and record manual Minecraft benchmarks.")
+    root = argparse.ArgumentParser(prog="farmbench", description="Compile farm blueprints and prepare Minecraft lab benchmarks.")
     root.add_argument("--version", action="version", version=__version__)
     commands = root.add_subparsers(dest="command", required=True)
     validate = commands.add_parser("validate", help="Check a blueprint's geometry, blocks and output ports")
@@ -37,7 +38,9 @@ def parser() -> argparse.ArgumentParser:
     build = commands.add_parser("build", help="Export a lab or survival schematic and materials")
     build.add_argument("blueprint", type=Path)
     build.add_argument("--variant", choices=("lab", "survival"), default="lab")
-    build.add_argument("--out", type=Path, required=True, help="New output directory")
+    build.add_argument("--out", type=Path, help="New output directory; defaults to a dated folder under dist/farmbench")
+    build.add_argument("--instance", type=Path, help="Game directory; defaults to Legacy Launcher's selected instance")
+    build.add_argument("--no-install", action="store_true", help="Export files without copying the schematic into Minecraft")
     plan = commands.add_parser("plan", help="Write a manual benchmark plan for a compiled lab build")
     plan.add_argument("blueprint", type=Path)
     plan.add_argument("--build", type=Path, required=True, help="The exported build.json")
@@ -51,6 +54,17 @@ def parser() -> argparse.ArgumentParser:
     record.add_argument("--notes", default="")
     record.add_argument("--actual-ticks", type=int, help="Known growth-enabled run ticks if the run differed from the plan")
     record.add_argument("--out", type=Path, required=True, help="New result JSON file")
+    job = commands.add_parser("job", help="Prepare an immutable job for the in-game Farmbench companion")
+    job.add_argument("blueprints", type=Path, nargs="+", help="Blueprints in design order (a, b, ...); one counter output each")
+    job.add_argument("--id", required=True, help="New job name; existing jobs are never overwritten")
+    job.add_argument("--instance", type=Path, help="Game directory; defaults to Legacy Launcher's selected instance")
+    job.add_argument("--origin", type=int, nargs=3, metavar=("X", "Y", "Z"), help="Absolute exported base origin; default is player position plus [0,2,0]")
+    job.add_argument("--mode", choices=("place", "existing"), default="place", help="Place in empty bays or verify manually placed builds; existing requires --origin")
+    job.add_argument("--repeats", type=int, default=3, help="Paired trials, 1-100 (default: 3)")
+    job.add_argument("--at", type=int, nargs=3, action="append", metavar=("X", "Y", "Z"), help="Absolute exported origin for each design; repeat once per blueprint and supply --origin. Default: x bays with 16-block gaps")
+    results = commands.add_parser("results", help="Summarize companion trial counts, rates and paired differences as JSON")
+    results.add_argument("path", type=Path, help="Companion result JSON, including failed or cancelled runs")
+    results.add_argument("--out", type=Path, help="Also save summary JSON to a new file; never overwrite")
     return root
 
 
@@ -67,9 +81,47 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "build":
             from .compiler import compile_blueprint
 
-            compile_blueprint(load_blueprint(args.blueprint), args.out, variant=args.variant)
+            data = load_blueprint(args.blueprint)
+            instance = None if args.no_install else resolve_instance(args.instance)
+            if args.out is None:
+                stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+                args.out = Path("dist/farmbench") / f"{data['name']}-{args.variant}-{stamp}"
+            build = compile_blueprint(data, args.out, variant=args.variant)
             print(f"Built {args.variant} schematic in {args.out}")
+            if instance is not None:
+                source = Path(build["artifact"]["path"])
+                folder = instance / "schematics"
+                folder.mkdir(exist_ok=True)
+                target = folder / source.name
+                if target.exists() and hashlib.sha256(target.read_bytes()).hexdigest() != build["artifact"]["sha256"]:
+                    # Preserve an older design already used by a loaded placement.
+                    target = folder / f"{source.stem}-{build['artifact']['sha256'][:12]}{source.suffix}"
+                if target.exists():
+                    if hashlib.sha256(target.read_bytes()).hexdigest() != build["artifact"]["sha256"]:
+                        raise ValueError(f"Different schematic already exists: {target}")
+                else:
+                    with target.open("xb") as output, source.open("rb") as original:
+                        shutil.copyfileobj(original, output)
+                print(f"Ready in Litematica: {target}")
             print(f"Read {args.out / 'placement.md'} before pasting.")
+        elif args.command == "job":
+            from .jobs import companion_installed, prepare_job
+
+            instance = resolve_instance(args.instance)
+            job = prepare_job(args.blueprints, args.id, instance, origin=args.origin, mode=args.mode, repeats=args.repeats, at=args.at)
+            folder = instance / "config" / "farmbench" / "jobs" / job["id"]
+            print(f"Job saved: {folder / 'job.json'}")
+            print(f"Structures and source/build files: {folder}")
+            if not companion_installed(instance):
+                print("Farmbench companion not found in mods. Install it before starting this job; preparation is complete.")
+            print(f"In a Creative lab world with commands enabled: /farmbench start {job['id']}")
+        elif args.command == "results":
+            from .jobs import summarize_results
+
+            summary = summarize_results(args.path)
+            if args.out is not None:
+                _write_json(args.out, summary)
+            print(json.dumps(summary, indent=2, ensure_ascii=True, allow_nan=False))
         elif args.command == "plan":
             from .benchmark import create_plan, render_plan
 

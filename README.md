@@ -31,4 +31,4 @@ Before using WorldGen, add the exact argument in [`optional-worldgen/java-argume
 
 With packwiz installed, run `scripts/build.ps1` to export survival and lab `.mrpack` files into `dist/`. Add `-WorldGen` for `retpack-worldgen.mrpack`, including config defaults and manual launcher instructions. Importing it does not apply Java arguments.
 
-[farmbench](tools/farmbench/README.md) compiles farm blueprints into schematics and records manual Carpet benchmarks.
+[farmbench](tools/farmbench/README.md) compiles farm blueprints into schematics and runs paired Carpet benchmarks with a local Fabric companion.

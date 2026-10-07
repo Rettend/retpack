@@ -1,20 +1,25 @@
 """Validate v1 semantic blueprints without contacting Minecraft or the network.
 
-The bundled registry covers every vanilla Java 26.2 block name, property domain,
-default block state, and item name. It is the pinned mcmeta generated summary,
-not a simulation of neighbor updates, block entities, or farm behavior.
+The bundled registry covers vanilla Java 26.2 block states, items, entity IDs
+and block entity IDs. Typed payloads are preserved, not simulated or interpreted
+as a guarantee that a particular entity can be spawned by Minecraft.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
+import struct
 from functools import lru_cache
 from importlib import resources
 from os import PathLike
 from pathlib import Path
 from typing import Any
+
+import nbtlib
+from nbtlib.literal.parser import Parser, tokenize
 
 FORMAT = "retpack-farm-blueprint-v1"
 MINECRAFT_VERSION = "26.2"
@@ -50,6 +55,20 @@ _CONTAINERS = {
         "waxed_oxidized_", "waxed_weathered_",
     )),
 }
+# Fresh identity contract: entities receive new UUIDs at placement. Passenger
+# trees are the supported relationship mechanism. Persistent identities and
+# world-entity references are refused, never silently removed. This applies
+# recursively to SNBT (including entities stored in spawners/beehives).
+_ENTITY_REFERENCES = {
+    "UUID", "UUIDMost", "UUIDLeast", "Owner", "OwnerUUID", "OwnerUUIDMost",
+    "OwnerUUIDLeast", "LoveCause", "HurtBy", "AngryAt", "Target", "TargetUUID",
+    "ConversionPlayer", "Trusted", "Thrower", "Attach", "Leash", "leash",
+    "RootVehicle", "vehicle", "root_vehicle", "owner", "owner_uuid", "uuid",
+    "trusted", "angry_at", "hurt_by", "love_cause", "conversion_player",
+    "minecraft:angry_at", "minecraft:liked_player",
+}
+_ENTITY_FIELDS = {"id", "Pos", "Rotation", "Passengers", "pos", "blockPos", "nbt"}
+_TILE_FIELDS = {"x", "y", "z", "Pos", "Rotation", "pos", "blockPos", "nbt"}
 
 
 class BlueprintError(ValueError):
@@ -130,6 +149,246 @@ def _registry() -> tuple[dict[str, tuple[dict, dict]], frozenset[str]]:
     return blocks, items
 
 
+@lru_cache(maxsize=1)
+def _entity_registry() -> tuple[frozenset[str], frozenset[str]]:
+    data = json.loads(
+        resources.files("farmbench").joinpath("data", "vanilla_26_2.json").read_text("utf-8")
+    )
+    entities = frozenset(f"minecraft:{name}" for name in data["entity_types"].split())
+    tiles = frozenset(f"minecraft:{name}" for name in data["block_entity_types"].split())
+    if len(entities) != data["entity_count"] or len(tiles) != data["block_entity_count"]:
+        raise RuntimeError("Bundled vanilla entity registry metadata does not match its contents")
+    return entities, tiles
+
+
+def _block_entity_id(name: str) -> str | None:
+    """Match the vanilla block families to the pinned block entity registry."""
+    _, types = _entity_registry()
+    short = name.removeprefix("minecraft:")
+    if short == "piston":
+        return None  # Only moving_piston has the minecraft:piston block entity.
+    if short.endswith("_bed"):
+        return None  # Minecraft 26.2 removed minecraft:bed from the block entity registry.
+    aliases = {
+        "bee_nest": "beehive", "soul_campfire": "campfire", "spawner": "mob_spawner",
+        "moving_piston": "piston", "suspicious_sand": "brushable_block",
+        "suspicious_gravel": "brushable_block", "chain_command_block": "command_block",
+        "repeating_command_block": "command_block",
+    }
+    target = aliases.get(short, short)
+    for suffix, family in (
+        ("_hanging_sign", "hanging_sign"), ("_sign", "sign"),
+        ("_banner", "banner"), ("_shulker_box", "shulker_box"),
+        ("_skull", "skull"), ("_shelf", "shelf"),
+        ("copper_chest", "chest"), ("copper_golem_statue", "copper_golem_statue"),
+    ):
+        if short.endswith(suffix):
+            target = family
+            break
+    if short in {f"{prefix}{wall}_head" for prefix in ("creeper", "dragon", "piglin", "player", "zombie")
+                 for wall in ("", "_wall")}:
+        target = "skull"
+    result = f"minecraft:{target}"
+    return result if result in types else None
+
+
+class _SnbtParser(Parser):
+    def parse_number(self):
+        tag = super().parse_number()
+        if isinstance(tag, nbtlib.String):
+            raise self.error("Invalid or out-of-range NBT numeric literal; quote it to use a string")
+        return tag
+
+    def parse_compound(self):
+        # nbtlib's default parser silently replaces duplicate compound keys.
+        result = nbtlib.Compound()
+        for token in self.collect_tokens_until("CLOSE_COMPOUND"):
+            if token.type not in ("NUMBER", "STRING", "QUOTED_STRING"):
+                raise self.error("Expected compound key")
+            key = self.unquote_string(token.value) if token.type == "QUOTED_STRING" else token.value
+            if key in result:
+                raise self.error(f"Duplicate compound key {key!r}")
+            if self.next().current_token.type != "COLON":
+                raise self.error("Expected colon")
+            self.next()
+            result[key] = self.parse()
+        return result
+
+
+def _modified_utf8(value: str) -> bytes:
+    """Java DataOutput.writeUTF encodes UTF-16 units, not Unicode code points."""
+    units = value.encode("utf-16-be")
+    encoded = bytearray()
+    for index in range(0, len(units), 2):
+        unit = (units[index] << 8) | units[index + 1]
+        if 0 < unit < 0x80:
+            encoded.append(unit)
+        elif unit < 0x800:
+            encoded.extend((0xC0 | (unit >> 6), 0x80 | (unit & 0x3F)))
+        else:
+            encoded.extend((0xE0 | (unit >> 12), 0x80 | ((unit >> 6) & 0x3F), 0x80 | (unit & 0x3F)))
+    return bytes(encoded)
+
+
+def _nbt_string(value: str, where: str) -> str:
+    value = _string(value, where, empty=True)
+    if len(_modified_utf8(value)) > 65535:
+        raise BlueprintError(f"{where}: NBT strings and keys may be at most 65535 modified UTF-8 bytes")
+    return value
+
+
+def _canonical_tag(tag, where: str):
+    if isinstance(tag, nbtlib.Compound):
+        for key in tag:
+            _nbt_string(key, where)
+        return nbtlib.Compound({key: _canonical_tag(tag[key], f"{where}.{key}")
+                               for key in sorted(tag)})
+    if isinstance(tag, nbtlib.List):
+        return type(tag)([_canonical_tag(value, f"{where}[{index}]")
+                          for index, value in enumerate(tag)])
+    if isinstance(tag, (nbtlib.Float, nbtlib.Double)):
+        if not math.isfinite(float(tag)):
+            raise BlueprintError(f"{where}: NBT numbers must be finite")
+        if isinstance(tag, nbtlib.Float):
+            try:
+                return nbtlib.Float(struct.unpack(">f", struct.pack(">f", float(tag)))[0])
+            except OverflowError as exc:
+                raise BlueprintError(f"{where}: NBT Float is outside its finite range") from exc
+    if isinstance(tag, nbtlib.String):
+        _nbt_string(str(tag), where)
+    return tag
+
+
+def _parse_snbt(value: Any, where: str) -> nbtlib.Compound:
+    """Parse one strict compound, preserving numeric, array and list tag types."""
+    literal = _string(value, where)
+    try:
+        parser = _SnbtParser(tokenize(literal))
+        tag = parser.parse()
+        if literal[parser.token_span[1]:].strip():
+            raise parser.error("Expected end of SNBT")
+        if not isinstance(tag, nbtlib.Compound):
+            raise BlueprintError(f"{where}: SNBT payload must be a compound")
+        return _canonical_tag(tag, where)
+    except BlueprintError:
+        raise
+    except (ValueError, TypeError, OverflowError, RecursionError) as exc:
+        raise BlueprintError(f"{where}: invalid SNBT compound: {exc}") from exc
+
+
+def _fresh_identity(tag, where: str) -> None:
+    if isinstance(tag, nbtlib.Compound):
+        for key, value in tag.items():
+            if key in _ENTITY_REFERENCES:
+                raise BlueprintError(
+                    f"{where}.{key}: fresh identity forbids saved UUIDs and world-entity "
+                    "references; use explicit passengers for riding relationships"
+                )
+            _fresh_identity(value, f"{where}.{key}")
+    elif isinstance(tag, nbtlib.List):
+        for index, value in enumerate(tag):
+            _fresh_identity(value, f"{where}[{index}]")
+
+
+def _payload(value: Any, where: str, reserved: set[str]) -> nbtlib.Compound:
+    tag = _parse_snbt(value, where)
+    collision = tag.keys() & reserved
+    if collision:
+        raise BlueprintError(
+            f"{where}: compiler-managed field(s) {', '.join(sorted(collision))}; "
+            "use the blueprint's position, rotation and passengers fields instead"
+        )
+    _fresh_identity(tag, where)
+    return tag
+
+
+def _snbt(tag: nbtlib.Compound) -> str:
+    return nbtlib.serialize_tag(_canonical_tag(tag, "nbt"), compact=True)
+
+
+def _entity_anchor(tag: nbtlib.Compound, where: str) -> list[int] | None:
+    """Hanging-entity anchors are logical coordinates, distinct from Pos."""
+    legacy = {"TileX", "TileY", "TileZ"} & tag.keys()
+    if legacy and "block_pos" in tag:
+        raise BlueprintError(f"{where}: ambiguous TileX/TileY/TileZ and block_pos anchors")
+    if legacy:
+        if legacy != {"TileX", "TileY", "TileZ"} or any(
+                not isinstance(tag[key], nbtlib.Int) for key in ("TileX", "TileY", "TileZ")):
+            raise BlueprintError(f"{where}: TileX/TileY/TileZ must all be NBT Int tags")
+        return [int(tag[key]) for key in ("TileX", "TileY", "TileZ")]
+    if "block_pos" in tag:
+        anchor = tag["block_pos"]
+        if isinstance(anchor, nbtlib.IntArray) and len(anchor) == 3:
+            return [int(part) for part in anchor]
+        if (isinstance(anchor, nbtlib.List) and anchor.subtype is nbtlib.Int and len(anchor) == 3):
+            return [int(part) for part in anchor]
+        if (isinstance(anchor, nbtlib.Compound) and anchor.keys() == {"x", "y", "z"}
+                and all(isinstance(anchor[axis], nbtlib.Int) for axis in "xyz")):
+            return [int(anchor[axis]) for axis in "xyz"]
+        raise BlueprintError(f"{where}.block_pos: expected three NBT Int coordinates")
+    return None
+
+
+def _entity_vector(value: Any, where: str, length: int = 3) -> list[float]:
+    if not isinstance(value, list) or len(value) != length:
+        raise BlueprintError(f"{where}: expected a {length}-number array")
+    result = []
+    for index, part in enumerate(value):
+        try:
+            number = float(part)
+        except (TypeError, ValueError, OverflowError):
+            number = math.nan
+        if type(part) not in (int, float) or not math.isfinite(number):
+            raise BlueprintError(f"{where}[{index}]: expected a finite number (not a boolean)")
+        if length == 2:
+            try:
+                number = struct.unpack(">f", struct.pack(">f", number))[0]
+            except OverflowError as exc:
+                raise BlueprintError(f"{where}[{index}]: rotation must fit a finite NBT Float") from exc
+        result.append(0.0 if number == 0 else number)
+    return result
+
+
+def _entities(value: Any, bounds: dict, where: str = "entities", depth: int = 0,
+              parent_role: str | None = None) -> list[dict]:
+    if not isinstance(value, list):
+        raise BlueprintError(f"{where}: expected an array of entities")
+    if depth >= 64 and value:
+        raise BlueprintError(f"{where}: passenger trees may be at most 64 levels deep")
+    types, _ = _entity_registry()
+    result = []
+    for index, given in enumerate(value):
+        entry = f"{where}[{index}]"
+        given = _object(given, entry, {"id", "pos", "rotation", "role", "nbt", "passengers"},
+                        {"id", "pos"})
+        entity_id = _string(given["id"], f"{entry}.id")
+        if entity_id not in types:
+            raise BlueprintError(f"{entry}.id: unknown vanilla {MINECRAFT_VERSION} entity {entity_id!r}")
+        position = _entity_vector(given["pos"], f"{entry}.pos")
+        _inside(position, bounds, f"{entry}.pos")
+        entity = {
+            "id": entity_id, "pos": position,
+            "rotation": _entity_vector(given.get("rotation", [0, 0]), f"{entry}.rotation", 2),
+            "role": _choice(given.get("role", parent_role or "farm"), f"{entry}.role", ("farm", "test")),
+        }
+        if "nbt" in given:
+            tag = _payload(given["nbt"], f"{entry}.nbt", _ENTITY_FIELDS)
+            anchor = _entity_anchor(tag, f"{entry}.nbt")
+            if anchor is not None:
+                _inside(anchor, bounds, f"{entry}.nbt hanging anchor")
+                for key in ("TileX", "TileY", "TileZ"):
+                    tag.pop(key, None)
+                tag["block_pos"] = nbtlib.IntArray(anchor)
+            entity["nbt"] = _snbt(tag)
+        if "passengers" in given:
+            entity["passengers"] = _entities(given["passengers"], bounds, f"{entry}.passengers",
+                                              depth + 1, entity["role"])
+            if any(passenger["role"] != entity["role"] for passenger in entity["passengers"]):
+                raise BlueprintError(f"{entry}.passengers: passengers must share their parent's role")
+        result.append(entity)
+    return result
+
+
 def _state(value: Any, where: str) -> dict:
     state = _object(value, where, {"Name", "Properties"}, {"Name"})
     name = _string(state["Name"], f"{where}.Name")
@@ -147,7 +406,7 @@ def _state(value: Any, where: str) -> dict:
     return result
 
 
-def _inside(position: list[int], bounds: dict, where: str) -> None:
+def _inside(position: list[int] | list[float], bounds: dict, where: str) -> None:
     if any(not start <= part < start + size
            for part, start, size in zip(position, bounds["min"], bounds["size"])):
         raise BlueprintError(
@@ -174,7 +433,7 @@ def _blocks(value: Any, bounds: dict) -> tuple[list[dict], dict[tuple[int, ...],
     positions = {}
     for index, given in enumerate(value):
         where = f"blocks[{index}]"
-        given = _object(given, where, {"pos", "state", "role"}, {"pos", "state"})
+        given = _object(given, where, {"pos", "state", "role", "nbt"}, {"pos", "state"})
         position = _vector(given["pos"], f"{where}.pos")
         _inside(position, bounds, f"{where}.pos")
         key = tuple(position)
@@ -185,6 +444,15 @@ def _blocks(value: Any, bounds: dict) -> tuple[list[dict], dict[tuple[int, ...],
             "state": _state(given["state"], f"{where}.state"),
             "role": _choice(given.get("role", "farm"), f"{where}.role", ("farm", "test")),
         }
+        if "nbt" in given:
+            tag = _payload(given["nbt"], f"{where}.nbt", _TILE_FIELDS)
+            expected = _block_entity_id(block["state"]["Name"])
+            if expected is None:
+                raise BlueprintError(f"{where}.nbt: state {block['state']['Name']} has no block entity")
+            if "id" in tag and (not isinstance(tag["id"], nbtlib.String) or str(tag["id"]) != expected):
+                raise BlueprintError(f"{where}.nbt.id: block state requires block entity {expected!r}")
+            tag["id"] = nbtlib.String(expected)
+            block["nbt"] = _snbt(tag)
         blocks.append(block)
         positions[key] = block
     return blocks, positions
@@ -292,13 +560,21 @@ def validate_blueprint(data: Any) -> dict:
     actual 26.2 defaults. Block role defaults to ``farm``; counter wool must be
     explicitly marked ``test``. Conditions and tick defaults match the example.
     Unknown fields, unsupported versions, and v0 input are rejected, not ignored.
+    Optional ``entities`` entries have ``id``, finite fractional ``pos``, optional
+    ``rotation`` ([yaw, pitch], default [0, 0]), ``role`` (farm/test), compound
+    ``nbt`` (SNBT), and recursive ``passengers`` (same schema and parent role).
+    Passenger roles default to the parent role; roots default to farm.
+    Optional block ``nbt`` is a compound SNBT payload; its id is inferred from
+    the block state or validated if supplied. Compiler-managed positions and
+    identity/reference fields are rejected. Hanging anchors in SNBT are logical
+    coordinates; other custom data is opaque and preserved without translation.
     """
     if isinstance(data, dict) and data.get("format") == "retpack-farm-blueprint-v0":
         raise BlueprintError(
             "format: v0 is not accepted; deliberately migrate to v1 with explicit bounds.min, "
             "blocks/state/role, counter and survival_output (see examples/bamboo_micro_v1.json)"
         )
-    fields = {"format", "name", "minecraft", "data_version", "bounds", "blocks", "ports",
+    fields = {"format", "name", "minecraft", "data_version", "bounds", "blocks", "ports", "entities",
               "conditions", "benchmark", "notes"}
     given = _object(data, "blueprint", fields,
                     {"format", "name", "minecraft", "bounds", "blocks", "ports", "benchmark"})
@@ -314,7 +590,7 @@ def validate_blueprint(data: Any) -> dict:
     notes = given.get("notes", [])
     if not isinstance(notes, list):
         raise BlueprintError("notes: expected an array of strings")
-    return {
+    result = {
         "format": FORMAT,
         "name": name,
         "minecraft": minecraft,
@@ -327,6 +603,10 @@ def validate_blueprint(data: Any) -> dict:
         "notes": [_string(note, f"notes[{index}]", empty=True)
                   for index, note in enumerate(notes)],
     }
+    # Do not insert absent optional fields: pre-extension v1 hashes stay stable.
+    if "entities" in given:
+        result["entities"] = _entities(given["entities"], bounds)
+    return result
 
 
 def _unique_keys(pairs: list[tuple[str, Any]]) -> dict:
@@ -366,13 +646,15 @@ def load_blueprint(path: str | PathLike[str]) -> dict:
 def blueprint_hash(data: Any) -> str:
     """SHA256 of default-resolved, key-sorted UTF-8 JSON without whitespace.
 
-    Block and port order is not semantic, so they are sorted by position and
-    name, respectively. Notes retain their supplied order. Invalid input never
+    Block, port and root entity order is not semantic, so those lists are sorted.
+    Passenger and note order is retained. Invalid input never
     receives a hash; equivalent implicit and explicit defaults hash identically.
     """
     canonical = validate_blueprint(data)
     canonical["blocks"].sort(key=lambda block: tuple(block["pos"]))
     canonical["ports"].sort(key=lambda port: port["name"])
+    if "entities" in canonical:
+        canonical["entities"].sort(key=lambda entity: json.dumps(entity, sort_keys=True, separators=(",", ":")))
     encoded = json.dumps(canonical, sort_keys=True, separators=(",", ":"),
                          ensure_ascii=False, allow_nan=False).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()

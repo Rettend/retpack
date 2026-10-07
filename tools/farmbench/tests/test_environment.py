@@ -4,7 +4,19 @@ import zipfile
 
 import pytest
 
-from farmbench.environment import capture_environment
+from farmbench.environment import capture_environment, resolve_instance
+
+
+def test_resolve_legacy_escaped_game_directory(tmp_path, monkeypatch):
+    instance = tmp_path / "my instance"
+    instance.mkdir()
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    settings = tmp_path / ".tlauncher/legacy/Minecraft/tl.properties"
+    settings.parent.mkdir(parents=True)
+    escaped = str(instance).replace("\\", "\\\\").replace(":", "\\:")
+    settings.write_text(f"minecraft.gamedir={escaped}\n", encoding="utf-8")
+    assert resolve_instance() == instance.resolve()
+    assert resolve_instance(instance) == instance.resolve()
 
 
 def make_instance(tmp_path):

@@ -4,9 +4,36 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import zipfile
 from pathlib import Path
+
+
+def resolve_instance(explicit: str | Path | None = None) -> Path:
+    """Use an explicit game directory or Legacy Launcher's selected directory."""
+    if explicit is not None:
+        root = Path(explicit)
+    else:
+        appdata = os.environ.get("APPDATA")
+        if not appdata:
+            raise ValueError("Supply --instance with your Minecraft game directory")
+        properties = Path(appdata) / ".tlauncher/legacy/Minecraft/tl.properties"
+        if not properties.is_file():
+            raise ValueError("Cannot find Legacy Launcher settings; supply --instance")
+        root = None
+        for line in properties.read_text(encoding="utf-8-sig").splitlines():
+            if line.startswith("minecraft.gamedir="):
+                value = line.partition("=")[2]
+                value = re.sub(r"\\(.)", lambda match: match[1], value)
+                if value.strip():
+                    root = Path(value)
+                break
+        if root is None:
+            raise ValueError("Legacy has no game directory selected; supply --instance")
+    if not root.is_dir():
+        raise ValueError(f"Game directory does not exist: {root}")
+    return root.resolve()
 
 
 def capture_environment(instance: str | Path) -> dict:

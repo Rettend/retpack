@@ -1,7 +1,7 @@
 [project]
 name = "retpack-farmbench"
 version = "0.1.0"
-description = "Compile Minecraft farm blueprints and record manual lab benchmarks"
+description = "Compile Minecraft farm blueprints and run paired lab benchmarks"
 requires-python = ">=3.11"
 dependencies = ["mcblueprint==0.1.0"]
 

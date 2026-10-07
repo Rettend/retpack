@@ -1,0 +1,71 @@
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+
+plugins {
+    id 'net.fabricmc.fabric-loom' version "${loom_version}"
+}
+
+version = project.version
+group = project.group
+base { archivesName = 'farmbench' }
+layout.buildDirectory = file('../../dist/farmbench-mod/build')
+
+repositories {
+    maven { url = 'https://api.modrinth.com/maven' }
+    mavenCentral()
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
+    // Exact Modrinth release from optional-lab/carpet.pw.toml (its Maven version is 26.2).
+    implementation 'maven.modrinth:carpet:bGrLxJ8v'
+    testImplementation platform('org.junit:junit-bom:5.13.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+processResources {
+    inputs.property 'version', project.version
+    filesMatching('fabric.mod.json') { expand version: project.version }
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(25)
+    withSourcesJar()
+}
+tasks.withType(JavaCompile).configureEach { options.release = 25 }
+sourceSets.test.java.srcDir 'src/testPlacement/java'
+test {
+    useJUnitPlatform()
+    maxHeapSize = '512m'
+    workingDir = layout.buildDirectory.dir('test-work').get().asFile
+    doFirst { workingDir.mkdirs() }
+}
+
+tasks.register('validateJob', JavaExec) {
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'me.rettend.farmbench.JobValidator'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) }
+    workingDir = layout.buildDirectory.dir('validation-work').get().asFile
+    doFirst {
+        if (!project.hasProperty('job')) throw new GradleException('Supply -Pjob=/path/to/job.json')
+        workingDir.mkdirs()
+        args file(project.property('job')).absolutePath
+    }
+}
+
+tasks.register('dist') {
+    dependsOn tasks.named('jar')
+    def binary = tasks.named('jar').flatMap { it.archiveFile }
+    def destination = file("../../dist/farmbench-mod/farmbench-${project.version}.jar")
+    inputs.file(binary)
+    outputs.file(destination)
+    doLast {
+        Files.createDirectories(destination.toPath().parent)
+        Files.copy(binary.get().asFile.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING)
+    }
+}
+tasks.named('build') { finalizedBy tasks.named('dist') }
